@@ -1,0 +1,14 @@
+# Database
+db/
+
+# Raw data (too large for github)
+data/raw/
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
+
+# Virtual environments
+venv/
+.env
