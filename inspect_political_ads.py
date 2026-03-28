@@ -154,3 +154,76 @@ print(creative["Ad_Type"].value_counts().to_string())
 
 con.close()
 print("\n=== Inspection complete ===")
+
+# ============================================================
+# 6. CALIFORNIA FOCUS
+#    Base population: advertisers who deliberately targeted CA
+# ============================================================
+con = sqlite3.connect(DB_PATH)
+
+section("6. CALIFORNIA — DELIBERATELY TARGETED ADVERTISERS")
+
+# Get advertiser IDs who explicitly targeted California
+ca_advertiser_ids = pd.read_sql("""
+    SELECT DISTINCT Advertiser_ID
+    FROM creative_stats
+    WHERE Geo_Targeting_Included LIKE '%California%'
+""", con)["Advertiser_ID"].tolist()
+
+print(f"  Advertisers who explicitly targeted CA: {len(ca_advertiser_ids):,}")
+print(f"  Total ads targeting CA:                 52,071")
+
+# --- Top advertisers by total spend ---
+subsection("Top 20 CA-targeting advertisers by total spend (USD)")
+top_spenders = pd.read_sql(f"""
+    SELECT 
+        a.Advertiser_Name,
+        a.Spend_USD            AS Total_Spend_USD,
+        a.Total_Creatives,
+        COUNT(c.Ad_ID)         AS CA_Ads,
+        SUM(c.Spend_Range_Min_USD + c.Spend_Range_Max_USD) / 2 AS Est_CA_Spend_USD
+    FROM advertiser_stats a
+    JOIN creative_stats c ON a.Advertiser_ID = c.Advertiser_ID
+    WHERE a.Advertiser_ID IN ({','.join(['?' for _ in ca_advertiser_ids])})
+      AND c.Geo_Targeting_Included LIKE '%California%'
+    GROUP BY a.Advertiser_ID, a.Advertiser_Name, a.Spend_USD, a.Total_Creatives
+    ORDER BY a.Spend_USD DESC
+    LIMIT 20
+""", con, params=ca_advertiser_ids)
+
+print(top_spenders.to_string(index=False))
+
+# --- Spend distribution among CA advertisers ---
+subsection("Spend distribution among CA-targeting advertisers")
+spend_dist = pd.read_sql(f"""
+    SELECT 
+        CASE 
+            WHEN Spend_USD = 0          THEN '0'
+            WHEN Spend_USD < 10000      THEN '1 - <10k'
+            WHEN Spend_USD < 100000     THEN '10k - 100k'
+            WHEN Spend_USD < 1000000    THEN '100k - 1M'
+            WHEN Spend_USD < 10000000   THEN '1M - 10M'
+            ELSE '> 10M'
+        END AS Spend_Bucket,
+        COUNT(*) AS Num_Advertisers
+    FROM advertiser_stats
+    WHERE Advertiser_ID IN ({','.join(['?' for _ in ca_advertiser_ids])})
+    GROUP BY Spend_Bucket
+    ORDER BY MIN(Spend_USD)
+""", con, params=ca_advertiser_ids)
+
+print(spend_dist.to_string(index=False))
+
+# --- Ad type breakdown for CA ads ---
+subsection("Ad type breakdown for CA-targeted ads")
+ad_types = pd.read_sql("""
+    SELECT Ad_Type, COUNT(*) as Count
+    FROM creative_stats
+    WHERE Geo_Targeting_Included LIKE '%California%'
+    GROUP BY Ad_Type
+    ORDER BY Count DESC
+""", con)
+print(ad_types.to_string(index=False))
+
+con.close()
+print("\n=== California inspection complete ===")
