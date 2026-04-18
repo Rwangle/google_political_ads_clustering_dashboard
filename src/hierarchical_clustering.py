@@ -1,7 +1,7 @@
 # hierarchical_clustering.py - phase 4
 # Ward linkage on clean data using same k as K-Means (phase 3).
 # Outliers assigned to nearest centroid via euclidean distance.
-# Same RF + API labeling as K-Means so names are comparable.
+# Same RF labeling as K-Means so names are comparable.
 # Average linkage excluded — prone to degenerate 1-vs-all splits.
 
 import json
@@ -9,7 +9,6 @@ import os
 import sqlite3
 import numpy as np
 import pandas as pd
-import urllib.request
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -89,51 +88,6 @@ def _rf_top_features(X_df, labels, feature_names, top_n=5):
     return cluster_feats, global_imp
 
 
-def _api_label(cluster_id, profile):
-    lines = "\n".join(
-        f"  - {f['readable']}: {f['direction']} "
-        f"({f['ratio']}x avg, RF importance={f['importance']})"
-        for f in profile["features"]
-    )
-    prompt = (
-        f"You are analyzing California political advertising data.\n"
-        f"A hierarchical cluster contains {profile['cluster_size']} advertisers "
-        f"({profile['pct_of_total']}% of the dataset).\n\n"
-        f"Random Forest identified these distinguishing features:\n{lines}\n\n"
-        f"Provide:\n"
-        f"1. SHORT NAME (3-5 words) describing the advertising STRATEGY.\n"
-        f"2. DESCRIPTION (2 sentences max) for a non-technical dashboard user.\n"
-        f"3. KEY METRICS — exactly 3 bullet points: '• [metric]: [meaning]'\n\n"
-        f"Respond ONLY with valid JSON, no markdown:\n"
-        f'{{ "short_name": "...", "description": "...", '
-        f'"key_metrics": ["• ...", "• ...", "• ..."] }}'
-    )
-    payload = json.dumps({
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 400,
-        "messages": [{"role": "user", "content": prompt}]
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        text = data["content"][0]["text"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        result = json.loads(text)
-        return (result.get("short_name", f"Cluster {cluster_id}"),
-                result.get("description", ""),
-                result.get("key_metrics", []))
-    except Exception as e:
-        print(f"    [API failed for cluster {cluster_id}: {e}]")
-        return None
 
 
 def _build_profile(top_feats, c_means, overall_means, cluster_size, total_size):
@@ -162,11 +116,6 @@ def _build_profile(top_feats, c_means, overall_means, cluster_size, total_size):
 
 def _label_cluster(cluster_id, top_feats, c_means, overall_means, sz, n_total):
     profile = _build_profile(top_feats, c_means, overall_means, sz, n_total)
-    result  = _api_label(cluster_id, profile)
-    if result is not None:
-        short, desc, metrics = result
-        print(f"    [API] {short}")
-        return short, desc, metrics
     feats = [f for f in profile["features"] if f["direction"] != "AVERAGE"]
     if not feats:
         return f"Cluster {cluster_id}", "No dominant features.", []
@@ -179,7 +128,7 @@ def _label_cluster(cluster_id, top_feats, c_means, overall_means, sz, n_total):
         f"• {f['readable']}: {f['direction'].lower()} ({f['ratio']}x average)"
         for f in feats[:3]
     ]
-    print(f"    [fallback] {short}")
+    print(f"    [label] {short}")
     return short, desc, metrics
 
 
@@ -275,7 +224,7 @@ def run(db_path=None, k=None):
     n_total       = len(df_clean)
 
     arch_short, arch_desc, arch_metrics = {}, {}, {}
-    print("  Calling Anthropic API for cluster labels...")
+    print("  Labeling clusters using Random Forest feature importance...")
     for c in range(k):
         sz = int((clean_labels == c).sum())
         print(f"\n  Cluster {c} (n={sz}):")

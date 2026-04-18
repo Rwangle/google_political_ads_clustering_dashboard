@@ -3,13 +3,12 @@
 # k chosen by composite score: silhouette + cluster balance + k-size
 # reward — hard floor of K_MIN=4 so we always get meaningful segments.
 # Random Forest per cluster finds top distinguishing features.
-# Anthropic API turns those features into plain-English labels.
+# RF feature importance used to label clusters (no external API needed).
 # Outliers assigned to nearest centroid post-hoc for dashboard toggle.
 
 import json
 import os
 import sqlite3
-import urllib.request
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -152,54 +151,6 @@ def _build_profile(top_feats, c_means, overall_means, cluster_size, total_size):
     }
 
 
-def _api_label(cluster_id, profile):
-    """Call Claude API to generate short_name, description, key_metrics."""
-    lines = "\n".join(
-        f"  - {f['readable']}: {f['direction']} "
-        f"({f['ratio']}x avg, RF importance={f['importance']})"
-        for f in profile["features"]
-    )
-    prompt = (
-        f"You are analyzing California political advertising data.\n"
-        f"A K-Means cluster contains {profile['cluster_size']} advertisers "
-        f"({profile['pct_of_total']}% of the dataset).\n\n"
-        f"Random Forest identified these distinguishing features:\n{lines}\n\n"
-        f"Provide:\n"
-        f"1. SHORT NAME (3-5 words) describing the advertising STRATEGY — "
-        f"not the political party. E.g. 'Precision Demographic Targeters'.\n"
-        f"2. DESCRIPTION (2 sentences max) for a non-technical dashboard user.\n"
-        f"3. KEY METRICS — exactly 3 bullet points, one line each, "
-        f"format: '• [metric]: [plain English meaning]'\n\n"
-        f"Respond ONLY with valid JSON, no markdown:\n"
-        f'{{ "short_name": "...", "description": "...", '
-        f'"key_metrics": ["• ...", "• ...", "• ..."] }}'
-    )
-    payload = json.dumps({
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 400,
-        "messages": [{"role": "user", "content": prompt}]
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        text = data["content"][0]["text"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        result = json.loads(text)
-        return (result.get("short_name", f"Cluster {cluster_id}"),
-                result.get("description", ""),
-                result.get("key_metrics", []))
-    except Exception as e:
-        print(f"    [API failed for cluster {cluster_id}: {e}]")
-        return None
 
 
 def _fallback_label(cluster_id, profile):
@@ -226,13 +177,8 @@ def _fallback_label(cluster_id, profile):
 
 def _label_cluster(cluster_id, top_feats, c_means, overall_means, sz, n_total):
     profile = _build_profile(top_feats, c_means, overall_means, sz, n_total)
-    result  = _api_label(cluster_id, profile)
-    if result is not None:
-        short, desc, metrics = result
-        print(f"    [API] {short}")
-        return short, desc, metrics, profile
     short, desc, metrics = _fallback_label(cluster_id, profile)
-    print(f"    [fallback] {short}")
+    print(f"    [label] {short}")
     return short, desc, metrics, profile
 
 
@@ -309,7 +255,7 @@ def run(db_path=None):
     arch_short, arch_desc, arch_metrics, arch_profiles = {}, {}, {}, {}
     n_total = len(df_clean)
 
-    print("  Calling Anthropic API for cluster labels...")
+    print("  Labeling clusters using Random Forest feature importance...")
     for c in range(best_k):
         sz   = int((clean_labels == c).sum())
         print(f"\n  Cluster {c} (n={sz}):")
