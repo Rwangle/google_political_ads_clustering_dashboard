@@ -303,10 +303,9 @@ def run( db_path=None):
         total_geo_spend=("Spend_USD","sum"  ),
     ).reset_index()
 
-    # THIS WAS THE BUG: geo table uses "CA" not "California"
-    # spent like 2 hours on this. the creative table uses full
-    # names but geo uses abbreviations because of course it does
-    ca_onlyy = geoRaww[geoRaww["Country_Subdivision_Primary"]=="CA"]
+    # FIX: geo table uses "CA" abbreviation, creative_stats uses "California"
+    # accept both so this works regardless of the data snapshot
+    ca_onlyy = geoRaww[geoRaww["Country_Subdivision_Primary"].isin(["CA", "California"])]
     caGeoSpnd = ca_onlyy.groupby("Advertiser_ID").agg(
         ca_spend=("Spend_USD","sum"),
     ).reset_index(  )
