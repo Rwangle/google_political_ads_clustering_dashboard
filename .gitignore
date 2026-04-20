@@ -12,3 +12,10 @@ __pycache__/
 # Virtual environments
 venv/
 .env
+output/
+data/raw/
+db/
+*.db
+__pycache__/
+*.pyc
+.DS_Store
