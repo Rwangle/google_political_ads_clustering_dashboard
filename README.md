@@ -19,7 +19,7 @@ Inside the project folder, locate the data/ directory
 Create a subfolder named: data/raw/
 Extract all CSV files from the Google dataset ZIP into this data/raw/ folder
 
-⚠️ Important:
+Important:
 The folder must be named exactly raw
 The CSV filenames should remain unchanged
 
