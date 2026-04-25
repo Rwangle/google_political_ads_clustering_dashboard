@@ -6,16 +6,24 @@ An interactive Tableau dashboard is included, allowing users to explore advertis
 
 INSTALLATION
 Step 1 — Download Raw Data
+Option A (Recommended for Reproducibility):
+Download the exact dataset snapshot used for this project:
+https://drive.google.com/drive/folders/1dEoctfTQRWxuXUxLEBpqajpCfpOXzpza?usp=sharing
+This ensures results match those reported in the final report.
+
+Option B (Original Source):
 Go to the Google Political Ads Transparency site:
 https://adstransparency.google.com/political?region=US&topic=political
 Click “Export Data” → “Download CSV”
-This will download a ZIP file containing multiple CSV files
+This will download a ZIP file containing multiple CSV files.
+Note: Using a fresh download may produce slightly different results.
+
 Step 2 — Download the project repository (ZIP) from GitHub
 Extract the ZIP file to your desired working directory
 NOTE: For grading purposes, the zip file submission contains all of this.
+
 Step 3 — Place Raw Data in Correct Folder
 Inside the project folder, locate the data/ directory
-
 Create a subfolder named: data/raw/
 Extract all CSV files from the Google dataset ZIP into this data/raw/ folder
 
