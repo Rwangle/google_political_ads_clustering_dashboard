@@ -1,8 +1,8 @@
 DESCRIPTION
-
 This project builds a data pipeline and interactive dashboard to analyze political advertising strategies in California using the Google Political Ads Transparency dataset.
 The system processes raw advertising data, engineers advertiser-level behavioral features, applies multiple clustering algorithms (K-Means and Hierarchical Clustering), detects outliers using DBSCAN, and outputs a final dataset (tableau_dashboard.csv) for visualization.
 An interactive Tableau dashboard is included, allowing users to explore advertiser behavior, compare clustering methods, and analyze targeting strategies, spending patterns, and efficiency metrics. The dashboard is not generated programmatically but is built on top of the pipeline output for interpretability and analysis.
+Link to Github repo: https://github.com/Rwangle/google_political_ads_clustering_dashboard
 
 INSTALLATION
 Step 1 — Download Raw Data
